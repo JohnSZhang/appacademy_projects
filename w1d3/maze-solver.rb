@@ -1,20 +1,20 @@
+require 'set'
 class Maze 
   
-  attr_reader :maze, :start, :exit, :agent, :path, :deadend
-  attr_accessor :current_position
+  attr_reader :maze, :start, :exit, :agent
   
   def initialize(filename)
-    @maze = File.readlines(filename)
+    @maze = File.readlines(filename).map(&:chomp).map
+    @maze = maze.map{|row| row.split('')}
+
     @start = self.maze_find("S")
+    puts "start at #{@start}"
     @exit = self.maze_find("E")
-    @agent = Agent.new
-    @deadend = []
-    @path = []
-    self.current_position = self.start
+    puts "ends at #{@exit}"
   end
   
   def position(pos)
-    return self.maze[pos[0]][pos[1]]
+    self.maze[pos[0]][pos[1]]
   end
   
   def maze_find(letter)
@@ -25,81 +25,101 @@ class Maze
     end
   end
   
-  def move(pos)
-    self.maze[pos[0]][pos[1]] = "X"
-    self.path << pos
-    self.current_position = pos
-  end
-  
   def move?(pos)
-    return self.position(pos) == ' ' || self.at_exit?(pos) 
-  end
-  
-  def not_dead?(pos)
-    return !self.deadend.include?(pos)
-  end
-  
-  def not_been?(pos)
-    return !self.path.include?(pos)
+    return self.position(pos) == ' ' || self.position(pos) == 'E'
   end
   
   def at_exit?(pos)
     return pos == self.exit
   end
   
-  def revert_move(pos)
-    self.deadend << pos
-    self.current_position = self.path.pop
-    self.maze[pos[0]][pos[1]] = " "
-  end
   
   def find_path
-    puts "self at exit is #{self.at_exit?(self.current_position)}"
-    until self.at_exit?(self.current_position)
-      new_pos = self.agent.move(self.current_position)
-      if !self.not_dead?(new_pos)
-        self.revert_move(current_position)
-        p "dead ends are #{self.deadend.to_s}"
-      elsif self.move?(new_pos) && self.not_been?(new_pos) && self.not_dead?(new_pos)
-        puts "found a new move at #{new_pos}"
-        self.render
-        self.move(new_pos)
-      else
-        next
-      end
-    end
-    p self.path
-    self.render
+    @agent = Agent.new(self)
+    render(self.agent.find_paths)
   end
   
-  def render
-    puts self.start
-    puts self.exit
-    p self.position([2,2])
-    self.maze.each {|row| puts "#{row}"}
+  def render(path = nil)
+    if path
+      path[1..-2].each do |pos|
+        self.maze[pos.first][pos.last] = "X"
+      end
+    end
+    self.maze.each{ |row| puts row.join('') } 
   end
 end
 
 class Agent
+  attr_accessor :position,:maze,:paths
+  
   MOVELIST = ['up', 'down', 'left', 'right']
-
-  def move(position)
-    return self.move_location(MOVELIST.sample, position)
+  def initialize(maze)
+    self.maze = maze
+    self.position = maze.start
+    self.paths = Set.new([[self.position]])
+  end
+  
+  def random_move(position)
+     self.move_location(MOVELIST.sample, position)
   end
   
   def move_location(direction, position)
     case direction
     when "up"
-      return [position[0]-1, position[1]]
+      [position.first-1, position.last]
     when "down"
-      return [position[0]+1, position[1]]
+      [position.first+1, position.last]
     when "left"
-      return [position[0], position[1]-1]
+      [position.first, position.last-1]
     when "right"
-      return [position[0], position[1]+1]
+      [position.first, position.last+1]
     end
   end
+  
+  def path_step(path)
+    pos = path.last
+    
+    all_pos = MOVELIST.map{|direction| move_location(direction, pos)}  
+    legal_pos = all_pos.select{|pos| maze.move?(pos) && !path.include?(pos)}
+    
+    return nil if legal_pos == []
+    
+    legal_pos.map{|legal| path.dup << legal}
+  end
+  
+  
+  
+  def find_paths
+    path_length = 0
+    while true
+      new_paths = Set.new
+      end_pos = Set.new
+      self.paths.each do |path|
 
+        pos = path.last
+        step_paths = path_step(path)
+        next unless step_paths 
+      
+        step_paths.each do |possible_path|
+          
+          next if end_pos.include?(possible_path.last)
+          end_pos << possible_path.last 
+          
+          if self.maze.at_exit?(possible_path.last)
+            puts "found solution!!"
+            #puts "#{possible_path.to_s}"
+            return possible_path 
+          end
+          if !new_paths.include?(possible_path)
+            new_paths << possible_path 
+          end    
+        end
+      end
+      path_length += 1
+      self.paths = new_paths
+    end
+  end
+  
 end
 
 if __FILE__ == $PROGRAM_NAME
