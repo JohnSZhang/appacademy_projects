@@ -107,7 +107,6 @@ class Agent
           
           if self.maze.at_exit?(possible_path.last)
             puts "found solution!!"
-            #puts "#{possible_path.to_s}"
             return possible_path 
           end
           if !new_paths.include?(possible_path)
